@@ -8,16 +8,7 @@ import { useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
 const AssigneeSelect = ({ issue }: { issue: Issue }) => {
-  const {
-    data: users,
-    error,
-    isLoading,
-  } = useQuery<User[]>({
-    queryKey: ["users"],
-    queryFn: () => axios.get("/api/users").then((res) => res.data),
-    staleTime: 60 * 1000, //60s
-    retry: 3,
-  });
+  const { data: users, error, isLoading } = useUsers();
 
   const [assigneeField, setAssigneeField] = useState(
     issue.assignedToUserId || "Unassigned"
@@ -27,21 +18,20 @@ const AssigneeSelect = ({ issue }: { issue: Issue }) => {
 
   if (error) return null;
 
+  const assignedIssue = async (userId: string) => {
+    await axios
+      .patch(`/api/issues/${issue.id}`, {
+        assignedToUserId: userId === "Unassigned" ? null : userId,
+      })
+      .catch(() => {
+        toast.error("Changes could not be saved.");
+      });
+    setAssigneeField(userId);
+  };
+
   return (
     <>
-      <Select.Root
-        value={assigneeField}
-        onValueChange={async (userId) => {
-          await axios
-            .patch(`/api/issues/${issue.id}`, {
-              assignedToUserId: userId === "Unassigned" ? null : userId,
-            })
-            .catch(() => {
-              toast.error("Changes could not be saved.");
-            });
-          setAssigneeField(userId);
-        }}
-      >
+      <Select.Root value={assigneeField} onValueChange={assignedIssue}>
         <Select.Trigger placeholder="Assign..." />
         <Select.Content>
           <Select.Group>
@@ -59,5 +49,13 @@ const AssigneeSelect = ({ issue }: { issue: Issue }) => {
     </>
   );
 };
+
+const useUsers = () =>
+  useQuery<User[]>({
+    queryKey: ["users"],
+    queryFn: () => axios.get("/api/users").then((res) => res.data),
+    staleTime: 60 * 1000, //60s
+    retry: 3,
+  });
 
 export default AssigneeSelect;
